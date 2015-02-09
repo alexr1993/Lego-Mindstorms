@@ -1,4 +1,4 @@
-package org.lejos.sample.bumpnavigator;
+
 import java.io.IOException;
 import java.util.Random;
 
