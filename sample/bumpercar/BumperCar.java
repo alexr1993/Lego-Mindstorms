@@ -1,4 +1,4 @@
-package org.lejos.sample.bumpercar;
+
 
 import lejos.nxt.Button;
 import lejos.nxt.LCD;
