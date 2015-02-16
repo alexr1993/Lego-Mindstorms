@@ -41,6 +41,7 @@ public class SubsumptionArch {
 		LCD.drawString("Bumper Car", 0, 1);
 		Button.waitForAnyPress();
 		arbitrator.start();
+		DifferentialPilot pilot = new DifferentialPilot(2.1f, 4.4f, Motor.A, Motor.B);
 
 	}
 }

@@ -14,3 +14,11 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
     compile name: 'classes'
 }
+
+task nxjc(type:Exec) {
+    args 'src/main/java/main/*.java', '-d', 'build/classes/main/main'
+    def file = new File('C:/Program Files (x86)/leJOS NXJ/bin/nxjc.bat');
+    // on windows:
+    executable file
+
+}
