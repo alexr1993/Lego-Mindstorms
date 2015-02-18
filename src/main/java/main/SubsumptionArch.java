@@ -1,11 +1,5 @@
-package main;
 
-import lejos.nxt.Button;
-import lejos.nxt.LCD;
-import lejos.nxt.Motor;
-import lejos.nxt.SensorPort;
-import lejos.nxt.TouchSensor;
-import lejos.nxt.UltrasonicSensor;
+import lejos.nxt.*;
 //import lejos.robotics.MirrorMotor;
 import lejos.robotics.RegulatedMotor;
 import lejos.robotics.navigation.DifferentialPilot;
@@ -24,114 +18,113 @@ import lejos.robotics.subsumption.Behavior;
  *
  */
 public class SubsumptionArch {
-	static RegulatedMotor leftMotor = Motor.A;
-	static RegulatedMotor rightMotor = Motor.C;
-
-	// Use these definitions instead if your motors are inverted
-	// static RegulatedMotor leftMotor = MirrorMotor.invertMotor(Motor.A);
-	//static RegulatedMotor rightMotor = MirrorMotor.invertMotor(Motor.C);
+	private DifferentialPilot pilot;
+	private Arbitrator arbitrator;
+	private RegulatedMotor leftMotor = Motor.A;
+	private RegulatedMotor rightMotor = Motor.C;
+	private LightSensor l = new LightSensor(SensorPort.S4);
+	private int lightThreshold = 400; // With floodlight on, higher than this reading implies we're facing a wall
 
 	public static void main(String[] args) {
-		leftMotor.setSpeed(400);
-		rightMotor.setSpeed(400);
+		SubsumptionArch s = new SubsumptionArch();
+		s.start();
+	}
+
+	public SubsumptionArch() {
+		pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
+		pilot.setTravelSpeed(5); // cm/s
+
+		l.setFloodlight(true);
 		Behavior b1 = new DriveForward();
 		Behavior b2 = new CorrectPath();
 		Behavior[] behaviorList = {b1, b2};
-		Arbitrator arbitrator = new Arbitrator(behaviorList);
-		LCD.drawString("Bumper Car", 0, 1);
+		arbitrator = new Arbitrator(behaviorList);
+
+		LCD.drawString("Press to Start", 0, 1);
 		Button.waitForAnyPress();
+	}
+
+	public void start() {
 		arbitrator.start();
-		DifferentialPilot pilot = new DifferentialPilot(2.1f, 4.4f, Motor.A, Motor.B);
-
-	}
-}
-
-
-class DriveForward implements Behavior {
-  private boolean _suppressed = false;
-
-  public boolean takeControl() {
-    return true;  // this behavior always wants control.
-  }
-
-  public void suppress() {
-    _suppressed = true;// standard practice for suppress methods
-  }
-
-  public void action() {
-    _suppressed = false;
-    SubsumptionArch.leftMotor.forward();
-    SubsumptionArch.rightMotor.forward();
-    while (!_suppressed) {
-      Thread.yield(); //don't exit till suppressed
-    }
-    SubsumptionArch.leftMotor.stop();
-    SubsumptionArch.rightMotor.stop();
-  }
-
-	protected void finalize() {	}
-}
-
-class CorrectPath implements Behavior {
-
-	private TouchSensor leftWhisker;
-	private TouchSensor rightWhisker;
-
-	public static boolean LEFT_SIDE = false;
-	public static boolean RIGHT_SIDE = false;
-
-	public CorrectPath() {
-		leftWhisker = new TouchSensor(SensorPort.S1);
-		rightWhisker = new TouchSensor(SensorPort.S2);
 	}
 
-	public boolean takeControl() {
-		if (leftWhisker.isPressed()) {
-			LEFT_SIDE = true;
-			RIGHT_SIDE = false;
-			return true;
+	class CorrectPath implements Behavior {
+		private TouchSensor leftWhisker;
+		private TouchSensor rightWhisker;
+		private boolean LEFT_SIDE = false;
+		private boolean RIGHT_SIDE = false;
+		private boolean locked = false; // prevent both bumpers triggering at once
+		private int turn_angle = 15;
+		private int left_angle = turn_angle;
+		private int right_angle = -turn_angle;
+		private int distance = -2; // Negative distance is reverse, measured in cm
+
+		public CorrectPath() {
+			leftWhisker = new TouchSensor(SensorPort.S1);
+			rightWhisker = new TouchSensor(SensorPort.S2);
 		}
-		if (rightWhisker.isPressed()) {
-			RIGHT_SIDE = true;
-			LEFT_SIDE = false;
-			return true;
+
+		public boolean takeControl() {
+			if (locked) return false;
+			LEFT_SIDE = leftWhisker.isPressed();
+			RIGHT_SIDE = rightWhisker.isPressed();
+
+			return LEFT_SIDE || RIGHT_SIDE || l.readNormalizedValue() > lightThreshold;
 		}
-		return false;
-	}
 
-	public void suppress() {
-		//Since  this is highest priority behavior, suppress will never be called.
-	}
+		public void suppress() {
+			//Since  this is highest priority behavior, suppress will never be called.
+		}
 
-	public void action() {
-		try {
-			// Left whisker pressed
-			if(LEFT_SIDE) {
+		public void action() {
+			locked = true; // this may not be necessary
+			LCD.scroll();
+			LCD.drawString("CorrectPath", 0, 1);
+			pilot.travel(distance);
+
+			if (LEFT_SIDE) {
 				// Turn right a bit
-				SubsumptionArch.leftMotor.backward();
-				SubsumptionArch.rightMotor.backward();
-				Thread.sleep(2000);
-				SubsumptionArch.leftMotor.forward();
-				SubsumptionArch.rightMotor.backward();
-				Thread.sleep(2000);
-			}
-			// Right whisker pressed
-			else {
+				pilot.rotate(right_angle);
+
+			} else {
 				// Turn left a bit
-				SubsumptionArch.rightMotor.backward();
-				SubsumptionArch.leftMotor.backward();
-				Thread.sleep(2000);
-				SubsumptionArch.rightMotor.forward();
-				SubsumptionArch.leftMotor.backward();
-				Thread.sleep(2000);
+				pilot.rotate(left_angle);
 			}
+			locked = false;
 		}
-		catch(Exception e){
-			LCD.drawString("Interrupted",0,1);
+
+		protected void finalize() {
 		}
 	}
-	protected void finalize() {	}
+
+	class DriveForward implements Behavior {
+		private boolean _suppressed = false;
+
+		public boolean takeControl() {
+			return true;  // this behavior always wants control.
+		}
+
+		public void suppress() {
+			_suppressed = true;// standard practice for suppress methods
+		}
+
+		public void action() {
+			LCD.scroll();
+			LCD.drawString("DriveForward", 0, 1);
+			_suppressed = false;
+			pilot.forward();
+			while (!_suppressed) {
+				LCD.drawString("Light: " + String.valueOf(l.readValue()) + ", " + String.valueOf(l.readNormalizedValue()), 0, 1);
+				Thread.yield(); //don't exit till suppressed
+			}
+			pilot.stop();
+		}
+
+		protected void finalize() {
+		}
+	}
 }
+
 
 /*
 class AvoidHeadOn implements Behavior {
