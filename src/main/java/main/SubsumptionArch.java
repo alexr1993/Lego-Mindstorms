@@ -18,113 +18,153 @@ import lejos.robotics.subsumption.Behavior;
  *
  */
 public class SubsumptionArch {
-	private DifferentialPilot pilot;
-	private Arbitrator arbitrator;
-	private RegulatedMotor leftMotor = Motor.A;
-	private RegulatedMotor rightMotor = Motor.C;
-	private LightSensor l = new LightSensor(SensorPort.S4);
-	private int lightThreshold = 400; // With floodlight on, higher than this reading implies we're facing a wall
+    private DifferentialPilot pilot;
+    private Arbitrator arbitrator;
+    private RegulatedMotor leftMotor = Motor.A;
+    private RegulatedMotor rightMotor = Motor.C;
+    private LightSensor l = new LightSensor(SensorPort.S4);
+    private int lightThreshold = 400; // With floodlight on, higher than this reading implies we're facing a wall
 
-	public static void main(String[] args) {
-		SubsumptionArch s = new SubsumptionArch();
-		s.start();
-	}
+    public static void main(String[] args) {
+        SubsumptionArch s = new SubsumptionArch();
+        s.start();
+    }
 
-	public SubsumptionArch() {
-		pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
-		pilot.setTravelSpeed(5); // cm/s
+    public SubsumptionArch() {
+        pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
+        pilot.setTravelSpeed(5); // cm/s
 
-		l.setFloodlight(true);
-		Behavior b1 = new DriveForward();
-		Behavior b2 = new CorrectPath();
-		Behavior[] behaviorList = {b1, b2};
-		arbitrator = new Arbitrator(behaviorList);
+        l.setFloodlight(true);
+        Behavior b1 = new DriveForward();
+        Behavior b2 = new FollowWall();
+        Behavior b3 = new CorrectPath();
+        Behavior[] behaviorList = {b1, b2, b3};
+        arbitrator = new Arbitrator(behaviorList);
 
-		LCD.drawString("Press to Start", 0, 1);
-		Button.waitForAnyPress();
-	}
+        LCD.drawString("Press to Start", 0, 1);
+        Button.waitForAnyPress();
+    }
 
-	public void start() {
-		arbitrator.start();
-	}
+    public void start() {
+        arbitrator.start();
+    }
 
-	class CorrectPath implements Behavior {
-		private TouchSensor leftWhisker;
-		private TouchSensor rightWhisker;
-		private boolean LEFT_SIDE = false;
-		private boolean RIGHT_SIDE = false;
-		private boolean locked = false; // prevent both bumpers triggering at once
-		private int turn_angle = 15;
-		private int left_angle = turn_angle;
-		private int right_angle = -turn_angle;
-		private int distance = -2; // Negative distance is reverse, measured in cm
+    class CorrectPath implements Behavior {
+        private TouchSensor leftWhisker;
+        private TouchSensor rightWhisker;
+        private boolean LEFT_SIDE = false;
+        private boolean RIGHT_SIDE = false;
+        private boolean locked = false; // prevent both bumpers triggering at once
+        private int turn_angle = 15;
+        private int left_angle = turn_angle;
+        private int right_angle = -turn_angle;
+        private int distance = -2; // Negative distance is reverse, measured in cm
 
-		public CorrectPath() {
-			leftWhisker = new TouchSensor(SensorPort.S1);
-			rightWhisker = new TouchSensor(SensorPort.S2);
-		}
+        public CorrectPath() {
+            leftWhisker = new TouchSensor(SensorPort.S1);
+            rightWhisker = new TouchSensor(SensorPort.S2);
+        }
 
-		public boolean takeControl() {
-			if (locked) return false;
-			LEFT_SIDE = leftWhisker.isPressed();
-			RIGHT_SIDE = rightWhisker.isPressed();
+        public boolean takeControl() {
+            if (locked) return false;
+            LEFT_SIDE = leftWhisker.isPressed();
+            RIGHT_SIDE = rightWhisker.isPressed();
 
-			return LEFT_SIDE || RIGHT_SIDE || l.readNormalizedValue() > lightThreshold;
-		}
+            return LEFT_SIDE || RIGHT_SIDE || l.readNormalizedValue() > lightThreshold;
+        }
 
-		public void suppress() {
-			//Since  this is highest priority behavior, suppress will never be called.
-		}
+        public void suppress() {
+            //Since  this is highest priority behavior, suppress will never be called.
+        }
 
-		public void action() {
-			locked = true; // this may not be necessary
-			LCD.scroll();
-			LCD.drawString("CorrectPath", 0, 1);
-			pilot.travel(distance);
+        public void action() {
+            locked = true; // this may not be necessary
+            LCD.scroll();
+            LCD.drawString("CorrectPath", 0, 1);
+            pilot.travel(distance);
 
-			if (LEFT_SIDE) {
-				// Turn right a bit
-				pilot.rotate(right_angle);
+            if (LEFT_SIDE) {
+                // Turn right a bit
+                pilot.rotate(right_angle);
 
-			} else {
-				// Turn left a bit
-				pilot.rotate(left_angle);
-			}
-			locked = false;
-		}
+            } else {
+                // Turn left a bit
+                pilot.rotate(left_angle);
+            }
+            locked = false;
+        }
 
-		protected void finalize() {
-		}
-	}
+        protected void finalize() {
+        }
+    }
 
-	class DriveForward implements Behavior {
-		private boolean _suppressed = false;
+    class DriveForward implements Behavior {
+        private boolean _suppressed = false;
 
-		public boolean takeControl() {
-			return true;  // this behavior always wants control.
-		}
+        public boolean takeControl() {
+            return true;  // this behavior always wants control.
+        }
 
-		public void suppress() {
-			_suppressed = true;// standard practice for suppress methods
-		}
+        public void suppress() {
+            _suppressed = true;// standard practice for suppress methods
+        }
 
-		public void action() {
-			LCD.scroll();
-			LCD.drawString("DriveForward", 0, 1);
-			_suppressed = false;
-			pilot.forward();
-			while (!_suppressed) {
-				LCD.drawString("Light: " + String.valueOf(l.readValue()) + ", " + String.valueOf(l.readNormalizedValue()), 0, 1);
-				Thread.yield(); //don't exit till suppressed
-			}
-			pilot.stop();
-		}
+        public void action() {
+            LCD.scroll();
+            LCD.drawString("DriveForward", 0, 1);
+            _suppressed = false;
+            pilot.forward();
+            while (!_suppressed) {
+                LCD.drawString("Light: " + String.valueOf(l.readValue()) + ", " + String.valueOf(l.readNormalizedValue()), 0, 1);
+                Thread.yield(); //don't exit till suppressed
+            }
+            pilot.stop();
+        }
 
-		protected void finalize() {
-		}
-	}
+        protected void finalize() {
+        }
+    }
+
+    class FollowWall implements Behavior {
+
+        private UltrasonicSensor sonar;
+        private boolean _suppressed = false;
+        private boolean TOO_CLOSE = false;
+        private boolean TOO_FAR = false;
+        private int turn_angle = 15;
+        private int left_angle = turn_angle;
+        private int right_angle = -turn_angle;
+
+        public FollowWall() {
+            sonar = new UltrasonicSensor(SensorPort.S3);
+        }
+
+        public boolean takeControl() {
+            sonar.continuous();
+            TOO_CLOSE = (sonar.getDistance() < 15);
+            TOO_FAR = (sonar.getDistance() > 25);
+            return sonar.getDistance() < 15 || sonar.getDistance() > 25;
+        }
+
+        public void suppress() {
+            _suppressed = true;// standard practice for suppress methods
+        }
+
+        public void action() {
+            LCD.scroll();
+            LCD.drawString("FollowWall", 0, 1);
+            _suppressed = false;
+            if (TOO_CLOSE) { // too close to wall, approaching wall at an angle?
+                pilot.steer(25, left_angle);
+            } else { // too far from wall, probably turning a corner
+                pilot.steer(-60, right_angle);
+            }
+        }
+
+        protected void finalize() {
+        }
+    }
 }
-
 
 /*
 class AvoidHeadOn implements Behavior {
