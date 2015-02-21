@@ -10,3 +10,13 @@ Intelligent Control and Cognitive Systems coursework
 - Need to move ultrasonic sensor further forwards as it is currently aligned with the 
   hweels making corner turning difficult. May need add some weight in the back of bot 
   also as it appears to be a little off balance. 
+
+Robot functionality checklist:
+
+Robot should be able to 
+- Wander around when no wall is in sight
+- Identify when close to a wall and align itself parallel to it
+- Travel alongside wall
+- Identify a corner which it is on the outside of and follow the wall around this corner - this is difficult
+- Identify a corner which it is on the inside of and turn to keep following the wall - use light sensor for this
+- Identify objects which cannot be followed but pose a risk of getting stuck and avoid them like the plague
