@@ -148,22 +148,18 @@ public class SubsumptionArch {
 
         public void action() {
             LCD.scroll();
-            LCD.drawString("units: " + sonar.getUnits(), 0, 1);
+            LCD.drawString("FollowWall", 0, 1);
             _suppressed = false;
              if (TOO_FAR) { // too far from wall, probably turning a corner
                 int count = 0; // if turned loads stop and try something else
                 int max = 30;
-                while(!_suppressed) {
-                    if(sonar.getDistance() > wall_dist && count < max) {
+                while(sonar.getDistance() > wall_dist && !_suppressed && count < max) {
                         LCD.drawString("Distance: " + String.valueOf(sonar.getDistance()), 0, 2);
                         pilot.steer(-90);
                         sonar.ping();
                         count++;
-                    }
-                    else {
-                        pilot.forward();
-                    }
                 }
+
             }
         }
 
