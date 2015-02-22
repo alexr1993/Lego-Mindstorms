@@ -129,21 +129,17 @@ public class SubsumptionArch {
 
         private UltrasonicSensor sonar;
         private boolean _suppressed = false;
-        private boolean TOO_CLOSE = false;
         private boolean TOO_FAR = false;
-        private int turn_angle = 15;
-        private int left_angle = turn_angle;
-        private int right_angle = -turn_angle;
+        private int wall_dist = 20; // how far to keep to/from wall
 
         public FollowWall() {
             sonar = new UltrasonicSensor(SensorPort.S3);
         }
 
         public boolean takeControl() {
-            sonar.continuous();
-            TOO_CLOSE = (sonar.getDistance() < 15);
-            TOO_FAR = (sonar.getDistance() > 25);
-            return sonar.getDistance() < 15 || sonar.getDistance() > 25;
+            sonar.ping();
+            TOO_FAR = (sonar.getDistance() > wall_dist);
+            return sonar.getDistance() > wall_dist;
         }
 
         public void suppress() {
@@ -152,12 +148,22 @@ public class SubsumptionArch {
 
         public void action() {
             LCD.scroll();
-            LCD.drawString("FollowWall", 0, 1);
+            LCD.drawString("units: " + sonar.getUnits(), 0, 1);
             _suppressed = false;
-            if (TOO_CLOSE) { // too close to wall, approaching wall at an angle?
-                pilot.steer(25, left_angle);
-            } else { // too far from wall, probably turning a corner
-                pilot.steer(-60, right_angle);
+             if (TOO_FAR) { // too far from wall, probably turning a corner
+                int count = 0; // if turned loads stop and try something else
+                int max = 30;
+                while(!_suppressed) {
+                    if(sonar.getDistance() > wall_dist && count < max) {
+                        LCD.drawString("Distance: " + String.valueOf(sonar.getDistance()), 0, 2);
+                        pilot.steer(-90);
+                        sonar.ping();
+                        count++;
+                    }
+                    else {
+                        pilot.forward();
+                    }
+                }
             }
         }
 
