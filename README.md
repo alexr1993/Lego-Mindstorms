@@ -15,6 +15,7 @@ Robot functionality checklist:
 
 Robot should be able to 
 - Wander around when no wall is in sight
+	- Moving in a spiral might be a good way to 'blindly' find a wall
 - Identify when close to a wall and align itself parallel to it
 - Travel alongside wall
 - Identify a corner which it is on the outside of and follow the wall around this corner - this is difficult
