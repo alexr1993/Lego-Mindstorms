@@ -129,7 +129,7 @@ public class SubsumptionArch {
 
         private UltrasonicSensor sonar;
         private boolean _suppressed = false;
-        private boolean TOO_FAR = false;
+        private boolean TOO_CLOSE = false;
         private int wall_dist = 20; // how far to keep to/from wall
 
         public FollowWall() {
@@ -138,8 +138,8 @@ public class SubsumptionArch {
 
         public boolean takeControl() {
             sonar.ping();
-            TOO_FAR = (sonar.getDistance() > wall_dist);
-            return sonar.getDistance() > wall_dist;
+            TOO_CLOSE = (sonar.getDistance() < wall_dist);
+            return TOO_CLOSE || sonar.getDistance() > wall_dist;
         }
 
         public void suppress() {
@@ -150,16 +150,27 @@ public class SubsumptionArch {
             LCD.scroll();
             LCD.drawString("FollowWall", 0, 1);
             _suppressed = false;
-             if (TOO_FAR) { // too far from wall, probably turning a corner
-                int count = 0; // if turned loads stop and try something else
-                int max = 30;
-                while(sonar.getDistance() > wall_dist && !_suppressed && count < max) {
-                        LCD.drawString("Distance: " + String.valueOf(sonar.getDistance()), 0, 2);
-                        pilot.steer(-90);
-                        sonar.ping();
-                        count++;
+            int count = 0; // if turned loads stop and try something else
+            int max = 80; // how much to turn before deciding there is no wall
+            sonar.continuous();
+            if (TOO_CLOSE){ // Move away from wall
+                while(sonar.getDistance() < wall_dist && !_suppressed) {
+                    LCD.scroll();
+                    LCD.drawString("Too close", 0, 1);
+                    pilot.steer(-2);
                 }
-
+            }
+            else { // Turn corner
+                LCD.scroll();
+                LCD.drawString("Turning corner", 0, 1);
+                while(sonar.getDistance() > wall_dist && !_suppressed && count < max) {
+                    //LCD.drawString("Distance: " + String.valueOf(sonar.getDistance()), 0, 2);
+                    pilot.steer(60);
+                    count++;
+                }
+                while(sonar.getDistance() > wall_dist && !_suppressed){
+                    pilot.forward();
+                }
             }
         }
 
