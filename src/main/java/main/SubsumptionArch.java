@@ -119,6 +119,7 @@ public class SubsumptionArch {
         private boolean shouldTurn = false;
         private int maxDistances = 4;
         private Object lock = new Object();
+        private int tooFar = 40;
         private ArrayList<Integer> distances = new ArrayList<>();
 
         public FollowCorner() {
@@ -128,7 +129,7 @@ public class SubsumptionArch {
                 private boolean shouldTurn() {
                     if (distances.size() < maxDistances) return false;
                     for(int i = 0; i < distances.size()-1; i++){
-                        if (distances.get(i) - distances.get(distances.size()-1) < changeThreshold)
+                        if (distances.get(i) < tooFar || distances.get(i) == 255)
                             return false;
                     }
                     return true;
@@ -198,7 +199,8 @@ public class SubsumptionArch {
             _suppressed = false;
             LCD.clearDisplay();
             LCD.drawString("Follow Corner", 0, 1);
-            pilot.rotate(turnAngle);
+            //pilot.rotate(turnAngle);
+            pilot.steer(50);
             try {
                 Thread.sleep(1000); // wait so we can see the state in the LCD display
             } catch (InterruptedException e) {
