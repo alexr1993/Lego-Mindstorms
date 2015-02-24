@@ -46,13 +46,12 @@ public class SubsumptionArch {
         pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
 		pilot.setTravelSpeed(circleLength/8); // cm/s - speed of circleLength/4 per second means 1 second to turn a corner
 
-        l.setFloodlight(true);
         Behavior b1 = new DriveForward();
         Behavior b2 = new FollowCorner();
         Behavior b3 = new CorrectPath();
         Behavior[] behaviorList = {b1, b2, b3};
         arbitrator = new Arbitrator(behaviorList);
-
+		l.setFloodlight(ColorSensor.Color.WHITE);
         LCD.drawString("Press to Start", 0, 1);
         Button.waitForAnyPress();
     }
@@ -66,10 +65,12 @@ public class SubsumptionArch {
         private TouchSensor rightWhisker;
         private boolean LEFT_SIDE = false;
         private boolean RIGHT_SIDE = false;
+		private boolean LIGHT_SENSOR = false;
         private boolean locked = false; // prevent both bumpers triggering at once
         private int turn_angle = 35;
         private int left_angle = turn_angle;
         private int right_angle = -turn_angle;
+		private int light_sensor_angle = -90; // move from wall in front to wall on left
         private int distance = -2; // Negative distance is reverse, measured in cm
 
         public CorrectPath() {
@@ -81,8 +82,8 @@ public class SubsumptionArch {
             if (locked) return false;
             LEFT_SIDE = leftWhisker.isPressed();
             RIGHT_SIDE = rightWhisker.isPressed();
-
-            return LEFT_SIDE || RIGHT_SIDE || l.readNormalizedValue() > lightThreshold;
+			LIGHT_SENSOR = l.readNormalizedValue() > lightThreshold;
+            return LEFT_SIDE || RIGHT_SIDE || LIGHT_SENSOR;
         }
 
         public void suppress() {
@@ -98,10 +99,12 @@ public class SubsumptionArch {
             if (LEFT_SIDE) {
                 // Turn right a bit
                 pilot.rotate(right_angle);
-
             } else if (RIGHT_SIDE) {
-                // Turn left a bit
-                pilot.rotate(left_angle);
+				// Turn left a bit
+				pilot.rotate(left_angle);
+			} else if (LIGHT_SENSOR) {
+				// Turn from facing wall head-on
+				pilot.rotate(light_sensor_angle);
             } else {
                 /* Light sensor has triggered, assume we are at corner */
                 pilot.travel(distance);
@@ -231,9 +234,9 @@ public class SubsumptionArch {
             _suppressed = false;
             pilot.forward();
             while (!_suppressed) {
-                //LCD.scroll();
+                //LCD.clearDisplay();
                 //LCD.drawString("Light: " + String.valueOf(l.readValue()) + ", " + String.valueOf(l.readNormalizedValue()), 0, 1);
-                //LCD.drawString("Distance: " + String.valueOf(s.getDistance()), 0, 1);
+
                 Thread.yield(); //don't exit till suppressed
             }
             pilot.stop();
