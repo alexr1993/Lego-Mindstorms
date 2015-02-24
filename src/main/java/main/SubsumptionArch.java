@@ -5,6 +5,9 @@ import lejos.robotics.RegulatedMotor;
 import lejos.robotics.navigation.DifferentialPilot;
 import lejos.robotics.subsumption.Arbitrator;
 import lejos.robotics.subsumption.Behavior;
+import java.lang.Runnable;
+import java.lang.Thread;
+import java.util.ArrayList;
 
 /**
  * Demonstration of the Behavior subsumption classes.
@@ -109,33 +112,82 @@ public class SubsumptionArch {
     class FollowCorner implements Behavior {
         private UltrasonicSensor sonar;
         private boolean _suppressed = false;
-        private float prev_dist = 255; // if this changes by more than the threshold we've lost the wall
-        private float changeThreshold = 10;
+        private int prev_dist = 255; // if this changes by more than the threshold we've lost the wall
+        private int changeThreshold = 30;
         private int turnAngle = 100; // 100 is 100 degrees anticlockwise
+        private Thread t;
+        private boolean shouldTurn = false;
+        private int maxDistances = 4;
+        private Object lock = new Object();
+        private ArrayList<Integer> distances = new ArrayList<>();
 
         public FollowCorner() {
             sonar = new UltrasonicSensor(SensorPort.S3);
             sonar.continuous();
+            t = new Thread(new Runnable() {
+                private boolean shouldTurn() {
+                    if (distances.size() < maxDistances) return false;
+                    for(int i = 0; i < distances.size()-1; i++){
+                        if (distances.get(i) - distances.get(distances.size()-1) < changeThreshold)
+                            return false;
+                    }
+                    return true;
+                }
+                public void run() {
+                    while(true) {
+                        int distance = sonar.getDistance();
+                        if (distances.size() == maxDistances) {
+                            distances.remove(maxDistances-1); // remove last element
+                        }
+                        distances.add(0, distance);
+                        float change = distance - prev_dist;
+                        if (shouldTurn()) {
+                            synchronized (lock) {
+                                shouldTurn = true;
+                                distances = new ArrayList<>();
+                                try {
+                                    Thread.sleep(3000);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                        prev_dist = distance;
+                        LCD.clearDisplay();
+                        LCD.drawString("Prev: " + prev_dist, 0, 1);
+                        LCD.drawString("Curr: " + distance, 0, 2);
+                        LCD.drawString("Change: " + change, 0, 3);
+                        LCD.drawString("Turn?: " + shouldTurn, 0, 4);
+                        LCD.drawString(distances.toString(), 0, 5);
+                        //for (int i = 0; i < distances.size(); i++ ) {
+                            //LCD.drawString("" + distances.get(i) + " ", i*2, 5);
+                        //}
+                        try {
+                            Thread.sleep(100); // Wait between readings
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            t.start();
         }
 
         public boolean takeControl() {
+            /*
             try {
                 // Wait for robot to move since last reading
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            float distance = sonar.getRange();
-            float change = distance - prev_dist;
-            LCD.clearDisplay();
-            LCD.drawString("Prev: " + prev_dist, 0, 1);
-            LCD.drawString("Curr: " + distance, 0, 2);
-            LCD.drawString("Change: " + change, 0, 3);
+            */
+
             // Only take control when distance increases dramatically
-            boolean control = change > changeThreshold;
-            LCD.drawString("TakeControl?: " + control, 0, 4);
-            this.prev_dist = distance;
-            return change > 0;
+            //boolean control = change > changeThreshold;
+
+            //this.prev_dist = distance;
+            return shouldTurn;
         }
 
         public void suppress() {
@@ -151,6 +203,9 @@ public class SubsumptionArch {
                 Thread.sleep(1000); // wait so we can see the state in the LCD display
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            }
+            synchronized (lock) {
+                shouldTurn = false;
             }
         }
 
