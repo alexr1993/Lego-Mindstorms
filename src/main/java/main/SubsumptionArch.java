@@ -8,6 +8,7 @@ import lejos.robotics.subsumption.Behavior;
 import java.lang.Runnable;
 import java.lang.Thread;
 import java.util.ArrayList;
+import java.util.Timer;
 
 /**
  * Demonstration of the Behavior subsumption classes.
@@ -28,6 +29,11 @@ public class SubsumptionArch {
     private LightSensor l = new LightSensor(SensorPort.S4);
     private int lightThreshold = 400; // With floodlight on, higher than this reading implies we're facing a wall
 
+	// For figuring out turning
+	private double pi = Math.PI;
+	private int radius = 10;
+	private int circleLength = (int)(2 * radius * pi);
+
     public static void main(String[] args) {
         SubsumptionArch s = new SubsumptionArch();
         UltrasonicSensor sonar = new UltrasonicSensor(SensorPort.S3);
@@ -38,7 +44,7 @@ public class SubsumptionArch {
 
     public SubsumptionArch() {
         pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
-        pilot.setTravelSpeed(5); // cm/s
+		pilot.setTravelSpeed(circleLength/8); // cm/s - speed of circleLength/4 per second means 1 second to turn a corner
 
         l.setFloodlight(true);
         Behavior b1 = new DriveForward();
@@ -61,7 +67,7 @@ public class SubsumptionArch {
         private boolean LEFT_SIDE = false;
         private boolean RIGHT_SIDE = false;
         private boolean locked = false; // prevent both bumpers triggering at once
-        private int turn_angle = 25;
+        private int turn_angle = 35;
         private int left_angle = turn_angle;
         private int right_angle = -turn_angle;
         private int distance = -2; // Negative distance is reverse, measured in cm
@@ -111,60 +117,65 @@ public class SubsumptionArch {
 
     class FollowCorner implements Behavior {
         private UltrasonicSensor sonar;
-        private boolean _suppressed = false;
-        private int prev_dist = 255; // if this changes by more than the threshold we've lost the wall
+
         private int changeThreshold = 30;
         private int turnAngle = 100; // 100 is 100 degrees anticlockwise
         private Thread t;
         private boolean shouldTurn = false;
-        private int maxDistances = 4;
+        private int maxDistances = 8;
+		private int distsToCheck = 4;
         private Object lock = new Object();
         private int tooFar = 40;
-        private ArrayList<Integer> distances = new ArrayList<>();
+		private ArrayList<Integer> distances = new ArrayList<>();
+		private int mean;
+		private int prevDist;
+		private boolean suppressed = false;
 
+		private int turn = 0; // Severity of turn required
         public FollowCorner() {
             sonar = new UltrasonicSensor(SensorPort.S3);
-            sonar.continuous();
             t = new Thread(new Runnable() {
-                private boolean shouldTurn() {
-                    if (distances.size() < maxDistances) return false;
-                    for(int i = 0; i < distances.size()-1; i++){
-                        if (distances.get(i) < tooFar || distances.get(i) == 255)
-                            return false;
+				/* Infer from the distances list how much we need to turn */
+                private void setTurn() {
+					if (distances.size() != maxDistances) return;
+					// Average the last x distances
+					prevDist = 0;
+					for (int i = distsToCheck; i < maxDistances; i++) {
+						prevDist += distances.get(i);
+					}
+					prevDist /= (maxDistances-distsToCheck);
+
+					// Find average change since the earliest dist in list
+					int total = 0;
+                    for(int i = 0; i < distsToCheck; i++){
+                        total += distances.get(i) - prevDist;
                     }
-                    return true;
+					mean = total / distsToCheck;
+					if (mean > 100) turn = 90;
+					else if (mean > 30) turn = 45;
+					else turn = 0;
                 }
                 public void run() {
+					/* Loop: Check distance, notify control methods to turn */
                     while(true) {
+						sonar.ping();
                         int distance = sonar.getDistance();
                         if (distances.size() == maxDistances) {
                             distances.remove(maxDistances-1); // remove last element
                         }
                         distances.add(0, distance);
-                        float change = distance - prev_dist;
-                        if (shouldTurn()) {
-                            synchronized (lock) {
-                                shouldTurn = true;
-                                distances = new ArrayList<>();
-                                try {
-                                    Thread.sleep(3000);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                            }
+						synchronized (lock) {
+							setTurn();
                         }
-                        prev_dist = distance;
-                        LCD.clearDisplay();
-                        LCD.drawString("Prev: " + prev_dist, 0, 1);
-                        LCD.drawString("Curr: " + distance, 0, 2);
-                        LCD.drawString("Change: " + change, 0, 3);
-                        LCD.drawString("Turn?: " + shouldTurn, 0, 4);
-                        LCD.drawString(distances.toString(), 0, 5);
-                        //for (int i = 0; i < distances.size(); i++ ) {
-                            //LCD.drawString("" + distances.get(i) + " ", i*2, 5);
-                        //}
+						LCD.clearDisplay();
+                        LCD.drawString("Curr: " + distance, 0, 1);
+                        LCD.drawString("Turn: " + turn, 0, 2);
+                        LCD.drawString(distances.toString(), 0, 3);
+						LCD.drawString("PrevDist: " + prevDist, 0, 4);
+						LCD.drawString("Mean: " + mean, 0, 5);
+
                         try {
-                            Thread.sleep(100); // Wait between readings
+                            Thread.sleep(500); // Wait between readings
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -175,40 +186,28 @@ public class SubsumptionArch {
         }
 
         public boolean takeControl() {
-            /*
-            try {
-                // Wait for robot to move since last reading
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            */
-
-            // Only take control when distance increases dramatically
-            //boolean control = change > changeThreshold;
-
-            //this.prev_dist = distance;
-            return shouldTurn;
+            return turn > 0;
         }
 
         public void suppress() {
-            _suppressed = true;// standard practice for suppress methods
+			suppressed = true;
         }
 
         public void action() {
-            _suppressed = false;
             LCD.clearDisplay();
             LCD.drawString("Follow Corner", 0, 1);
-            //pilot.rotate(turnAngle);
-            pilot.steer(50);
-            try {
-                Thread.sleep(1000); // wait so we can see the state in the LCD display
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            synchronized (lock) {
+
+			int sleepTime = 2000/90 * turn; // 45 degrees is 1 second, 90 is 2
+			sleepTime += 200;
+            pilot.arcForward(radius);
+
+			long startTime = System.currentTimeMillis();
+			while (System.currentTimeMillis() - sleepTime < startTime && ! suppressed) {}
+
+			synchronized (lock) {
                 shouldTurn = false;
             }
+			suppressed = false;
         }
 
         protected void finalize() {
