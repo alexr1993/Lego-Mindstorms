@@ -44,7 +44,7 @@ public class SubsumptionArch {
 
     public SubsumptionArch() {
         pilot = new DifferentialPilot(2.1f, 4.4f, leftMotor, rightMotor);
-		pilot.setTravelSpeed(circleLength/8); // cm/s - speed of circleLength/4 per second means 1 second to turn a corner
+		pilot.setTravelSpeed(circleLength/10); // cm/s - speed of circleLength/4 per second means 1 second to turn a corner
 
         Behavior b1 = new DriveForward();
         Behavior b2 = new FollowCorner();
@@ -155,7 +155,7 @@ public class SubsumptionArch {
                     }
 					mean = total / distsToCheck;
 					if (mean > 100) turn = 90;
-					else if (mean > 30) turn = 45;
+					else if ( (mean > 5) || (distances.get(1) > 25)) turn = 40;
 					else turn = 0;
                 }
                 public void run() {
@@ -178,7 +178,7 @@ public class SubsumptionArch {
 						LCD.drawString("Mean: " + mean, 0, 5);
 
                         try {
-                            Thread.sleep(500); // Wait between readings
+                            Thread.sleep(400); // Wait between readings
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -201,7 +201,7 @@ public class SubsumptionArch {
             LCD.drawString("Follow Corner", 0, 1);
 
 			int sleepTime = 2000/90 * turn; // 45 degrees is 1 second, 90 is 2
-			sleepTime += 200;
+            sleepTime += 400;
             pilot.arcForward(radius);
 
 			long startTime = System.currentTimeMillis();
