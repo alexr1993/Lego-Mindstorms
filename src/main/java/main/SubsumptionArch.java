@@ -101,7 +101,9 @@ public class SubsumptionArch {
                 pilot.rotate(right_angle);
             } else if (RIGHT_SIDE) {
 				// Turn left a bit
-				pilot.rotate(left_angle);
+				//pilot.rotate(left_angle);
+                //Back up and turn around
+                pilot.rotate(-90);
 			} else if (LIGHT_SENSOR) {
 				// Turn from facing wall head-on
 				pilot.rotate(light_sensor_angle);
@@ -178,7 +180,7 @@ public class SubsumptionArch {
 						LCD.drawString("Mean: " + mean, 0, 5);
 
                         try {
-                            Thread.sleep(400); // Wait between readings
+                            Thread.sleep(250); // Wait between readings
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
