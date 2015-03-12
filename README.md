@@ -1,6 +1,10 @@
 # Lego-Mindstorms
 Intelligent Control and Cognitive Systems coursework
 
+This was hacked together. It is mine and vendorofdoom's creation, an adaptation of some samples obtained from lejos.org - the providers of this java implementation on the Lego Mindstorms kit.
+
+* * *
+The robot implemented in this project will follow walls when configured with a left facing ultrasound, and frontal bumpers +  a light sensor.
 
 09/02:
 - Figure out what an intelligent robot should be able to do
